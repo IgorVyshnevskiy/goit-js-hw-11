@@ -1,90 +1,68 @@
-
-import './index.css';
-import SlimSelect from 'slim-select';
-import '/node_modules/slim-select/dist/slimselect.css';
+import SimpleLightbox from 'simplelightbox';
+import 'simplelightbox/dist/simple-lightbox.min.css';
 import Notiflix from 'notiflix';
 
-import { fetchBreeds, fetchCatByBreed } from './cat-api.js';
+import FetchPhotosFromAPI from './PixabayAPI';
+import renderMarkup from './createMarkup';
+import LoadMoreBtn from './loadMore';
 
-const refs = {
-  select: document.querySelector('.breed-select'),
-  catInfo: document.querySelector('.cat-info'),
-  loader: document.getElementById('loader'),
-  error: document.querySelector('.error'),
-};
-function slim() {
-  new SlimSelect({
-    select: refs.select,
-    settings: {
-      showSearch: false,
-      searchText: 'Sorry nothing here',
-      searchPlaceholder: 'Search',
-      searchHighlight: true,
-    },
+const galleryEl = document.querySelector('.gallery');
+const formEl = document.querySelector('#search-form');
+
+const apiService = new FetchPhotosFromAPI();
+const loadMoreBtn = new LoadMoreBtn({
+  selector: '[data-action="load-more"]',
+  hidden: true,
+});
+
+const gallery = new SimpleLightbox('.gallery__link', {});
+
+formEl.addEventListener('submit', onFormSubmit);
+loadMoreBtn.refs.button.addEventListener('click', onLoadBtnClick);
+
+function onLoadBtnClick() {
+  loadMoreBtn.disable();
+
+  apiService.getPhotos().then(images => {
+    if (images.length === 0) {
+      nothingFound();
+
+      loadMoreBtn.hide();
+    }
+
+    renderMarkup(images);
+    gallery.refresh();
+    loadMoreBtn.enable();
+
+    const currentPage = FetchPhotosFromAPI.page;
+    const totalPages = Math.ceil(Number(images.totalHits) / 40);
+    if (currentPage > totalPages) {
+      endOfCollection();
+      loadMoreBtn.hide();
+    }
   });
 }
 
-refs.error.classList.add('is-hidden');
-refs.catInfo.classList.add('is-hidden');
-refs.select.classList.add('is-hidden');
+function onFormSubmit(event) {
+  event.preventDefault();
 
-fetchBreeds()
-  .then(data => {
-    refs.select.innerHTML = createList(data);
-    slim();
-    refs.select.classList.remove('is-hidden');
-    refs.loader.classList.replace('loader', 'is-hidden');
-    
-  })
-  .catch(onFetchError);
+  apiService.searchQuery = event.currentTarget.elements.searchQuery.value.trim();
 
-refs.select.addEventListener('change', onSelectBreed);
+  if (apiService.query === '') {
+    return Notiflix.Notify.failure('Enter some text');
+  }
 
-function onSelectBreed(event) {
-  refs.loader.classList.replace('is-hidden', 'loader');
-  Notiflix.Notify.info('Loading data, please wait...')
-  refs.select.classList.add('is-hidden');
-  refs.catInfo.classList.add('is-hidden');
-  const breedId = event.currentTarget.value;
-
-  fetchCatByBreed(breedId)
-    .then(data => {
-      refs.loader.classList.replace('loader', 'is-hidden');
-      refs.select.classList.remove('is-hidden');
-      createMarkup(data);
-
-      refs.catInfo.classList.remove('is-hidden');
-    })
-    .catch(onFetchError);
+  loadMoreBtn.show();
+  apiService.resetPage();
+  galleryEl.innerHTML = '';
+  onLoadBtnClick();
 }
 
-function createList(arr) {
-  return arr
-    .map(({ id, name }) => `<option value="${id}">${name}</option>`)
-    .join('');
-}
-
-function createMarkup(data) {
-  const card = data
-    .map(el => {
-      return `<li><img src="${el.url}" alt="${el.breeds[0].name}" width="400"/><h2>${el.breeds[0].name}</h2><p>${el.breeds[0].description}</p><h3>Temperament</h3><p>${el.breeds[0].temperament}</p></li>`;
-    })
-    .join('');
-  refs.catInfo.innerHTML = card;
-}
-
-function onFetchError(error) {
-  refs.select.classList.remove('is-hidden');
-  refs.loader.classList.replace('loader', 'is-hidden');
-  refs.catInfo.innerHTML = '';
-
+function nothingFound() {
   Notiflix.Notify.failure(
-    'Oops! Something went wrong! Try reloading the page or select another cat breed!',
-    {
-      position: 'center-center',
-      timeout: 5000,
-      width: '400px',
-      fontSize: '24px',
-    }
+    'Sorry, there are no images matching your search query. Please try again.',
   );
+}
+function endOfCollection() {
+  Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
 }
