@@ -2,7 +2,7 @@ import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 import Notiflix from 'notiflix';
 
-import FetchPhotosFromAPI from './PixabayAPI';
+import FetchPhotosFromAPI from './pixabayAPI';
 import renderMarkup from './createMarkup';
 import LoadMoreBtn from './loadMore';
 
